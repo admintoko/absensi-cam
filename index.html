@@ -236,9 +236,15 @@ function doScan() {
 
   var video = document.getElementById('cam');
   var canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth || 640;
-  canvas.height = video.videoHeight || 480;
-  canvas.getContext('2d').drawImage(video, 0, 0);
+  var vw = video.videoWidth || 640;
+  var vh = video.videoHeight || 480;
+  // Ambil area kotak dari tengah video (crop square)
+  var size = Math.min(vw, vh);
+  var sx = (vw - size) / 2;
+  var sy = (vh - size) / 2;
+  canvas.width = size;
+  canvas.height = size;
+  canvas.getContext('2d').drawImage(video, sx, sy, size, size, 0, 0, size, size);
 
   faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions())
     .withFaceLandmarks()
