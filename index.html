@@ -273,16 +273,26 @@ function doScan() {
       sm.getContext('2d').drawImage(canvas, 0, 0, 300, 300);
       var photoDataUrl = sm.toDataURL('image/jpeg', 0.6);
 
-      status.textContent = '✅ Verifikasi berhasil!';
+      status.textContent = '✅ Wajah cocok! Menyimpan absensi...';
       status.className = 'status success';
       btn.textContent = '✅ Berhasil';
-
-      // Kirim hasil kembali ke parent (Apps Script)
-      window.parent.postMessage({
+      
+      // Kirim ke parent/opener
+      var msg = {
         type: 'face_verified',
         photo: photoDataUrl,
         descriptor: Array.from(detection.descriptor)
-      }, '*');
+      };
+      
+      // Untuk popup (window.opener)
+      if(window.opener) {
+        window.opener.postMessage(msg, '*');
+        setTimeout(function(){ window.close(); }, 1500);
+      }
+      // Untuk iframe (window.parent)
+      else {
+        window.parent.postMessage(msg, '*');
+      }
 
     }).catch(function(err) {
       status.textContent = 'Error: ' + err.message;
