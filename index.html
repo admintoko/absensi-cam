@@ -414,9 +414,18 @@
         }
 
         // Start
-        window.addEventListener('load', function () {
-            startCamera();
-        });
+        function initApp() {
+            if(!window.appInitialized) {
+                window.appInitialized = true;
+                startCamera();
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
     </script>
 </body>
 
