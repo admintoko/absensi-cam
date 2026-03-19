@@ -344,27 +344,54 @@
                 .withFaceDescriptor()
                 .then(function (detection) {
                     var circle = document.getElementById('circle');
+                    var failBox = document.getElementById('fail-box');
+                    var statusEl = document.getElementById('status');
+
                     if (!detection) {
                         if(circle) circle.classList.remove('detected');
+                        if(failBox) failBox.style.display = 'none';
                         isProcessingAuto = false;
                         return;
                     }
 
                     if(circle) circle.classList.add('detected');
 
-                    // Verifikasi jarak wajah jika descriptor tersedia
-                    if (faceDescriptorFromParent) {
-                        var dist = faceapi.euclideanDistance(detection.descriptor, faceDescriptorFromParent);
-                        // Instant match at 0.65 threshold (very tolerant for speed)
-                        if (dist > 0.65) { 
-                            isProcessingAuto = false;
-                            return;
+                    // 1. Cek apakah admin sudah mendaftarkan wajah karyawan ini
+                    if (!faceDescriptorFromParent || faceDescriptorFromParent.length === 0) {
+                        if(failBox) {
+                            failBox.innerHTML = 'Data wajah belum terdaftar di sistem.<br>Silakan hubungi Admin untuk mendaftar.';
+                            failBox.style.display = 'block';
                         }
+                        if(statusEl) {
+                            statusEl.textContent = 'Gagal: Wajah Belum Terdaftar';
+                            statusEl.className = 'status error';
+                        }
+                        isProcessingAuto = false;
+                        return;
+                    }
+
+                    // 2. Verifikasi jarak wajah karena descriptor tersedia
+                    var dist = faceapi.euclideanDistance(detection.descriptor, faceDescriptorFromParent);
+                    // Threshold diperketat dari 0.65 ke 0.55 untuk keamanan (kurang dari 0.55 = cocok)
+                    if (dist > 0.55) { 
+                        if(failBox) {
+                            failBox.innerHTML = 'Wajah tidak cocok dengan data karyawan.<br>Jarak: ' + dist.toFixed(2) + ' (Batas: 0.55)';
+                            failBox.style.display = 'block';
+                        }
+                        if(statusEl) {
+                            statusEl.textContent = 'Gagal: Wajah Berbeda';
+                            statusEl.className = 'status error';
+                        }
+                        isProcessingAuto = false;
+                        return;
                     }
 
                     // Success!
-                    document.getElementById('status').textContent = '✅ Wajah cocok! Memproses...';
-                    document.getElementById('status').className = 'status success';
+                    if(failBox) failBox.style.display = 'none';
+                    if(statusEl) {
+                        statusEl.textContent = '✅ Wajah cocok! Memproses...';
+                        statusEl.className = 'status success';
+                    }
                     
                     // High-speed return
                     var photoDataUrl = canvas.toDataURL('image/jpeg', 0.6); // Use the existing detection canvas to save time
