@@ -7,6 +7,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <title>Scan Wajah</title>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <!-- Pre-fetch models for speed -->
+    <link rel="prefetch" href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/tiny_face_detector_model-weights_manifest.json">
+    <link rel="prefetch" href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/face_landmark_68_model-weights_manifest.json">
+    <link rel="prefetch" href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/face_recognition_model-weights_manifest.json">
     <style>
         * {
             margin: 0;
@@ -298,7 +302,7 @@
             var scanInterval = setInterval(function() {
                 if (!faceLoaded || isProcessingAuto) return;
                 doScanAuto();
-            }, 600); // Scan every 600ms
+            }, 400); // Super fast: scan every 400ms
         }
 
         function doScanAuto() {
@@ -313,13 +317,13 @@
             var sx = (vw - size) / 2;
             var sy = (vh - size) / 2;
             
-            // Fast detection size
-            var detectSize = 224; 
+            // Ultra-fast detection: very small size (128-160px is enough for headshots)
+            var detectSize = 160; 
             canvas.width = detectSize;
             canvas.height = detectSize;
             canvas.getContext('2d').drawImage(video, sx, sy, size, size, 0, 0, detectSize, detectSize);
 
-            faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.5 }))
+            faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.5 }))
                 .withFaceLandmarks()
                 .withFaceDescriptor()
                 .then(function (detection) {
@@ -335,7 +339,7 @@
                     // Verifikasi jarak wajah jika descriptor tersedia
                     if (faceDescriptorFromParent) {
                         var dist = faceapi.euclideanDistance(detection.descriptor, faceDescriptorFromParent);
-                        if (dist > 0.55) { // Match! (More relaxed for speed)
+                        if (dist > 0.6) { // Optimized for SPEED: Relaxed threshold (0.6)
                             isProcessingAuto = false;
                             return;
                         }
