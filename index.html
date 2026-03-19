@@ -372,14 +372,14 @@
 
                     // 2. Verifikasi jarak wajah karena descriptor tersedia
                     var dist = faceapi.euclideanDistance(detection.descriptor, faceDescriptorFromParent);
-                    // Threshold diperketat dari 0.65 ke 0.55 untuk keamanan (kurang dari 0.55 = cocok)
-                    if (dist > 0.55) { 
+                    // Threshold diturunkan menjadi 0.4 untuk mencegah wajah orang lain yang agak mirip bisa lolos
+                    if (dist > 0.40) { 
                         if(failBox) {
-                            failBox.innerHTML = 'Wajah tidak cocok dengan data karyawan.<br>Jarak: ' + dist.toFixed(2) + ' (Batas: 0.55)';
+                            failBox.innerHTML = 'Wajah tidak cocok dengan data karyawan.<br>Jarak: ' + dist.toFixed(3) + ' (Batas Max: 0.40)<br>Harap gunakan ID Anda sendiri.';
                             failBox.style.display = 'block';
                         }
                         if(statusEl) {
-                            statusEl.textContent = 'Gagal: Wajah Berbeda';
+                            statusEl.textContent = 'Gagal: Wajah Berbeda (' + dist.toFixed(2) + ')';
                             statusEl.className = 'status error';
                         }
                         isProcessingAuto = false;
@@ -389,7 +389,7 @@
                     // Success!
                     if(failBox) failBox.style.display = 'none';
                     if(statusEl) {
-                        statusEl.textContent = '✅ Wajah cocok! Memproses...';
+                        statusEl.textContent = '✅ Wajah cocok! (Skor: ' + dist.toFixed(3) + ') Memproses...';
                         statusEl.className = 'status success';
                     }
                     
