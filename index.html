@@ -37,10 +37,30 @@
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            border: 3px solid #3b82f6;
+            border: 4px solid #3b82f6;
             overflow: hidden;
             background: #000;
             box-shadow: 0 0 40px rgba(59, 130, 246, 0.3);
+            position: relative;
+            transition: border-color 0.3s;
+        }
+
+        .face-guide {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            height: 80%;
+            border: 2px dashed rgba(255,255,255,0.4);
+            border-radius: 50% 50% 45% 45%; 
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .scan-circle.detected {
+            border-color: #10b981;
+            box-shadow: 0 0 40px rgba(16, 185, 129, 0.5);
         }
 
         video {
@@ -176,8 +196,9 @@
     <div class="sublabel" id="subtitle">Posisikan wajah Anda di tengah lingkaran</div>
 
     <div class="scan-container">
-        <div class="scan-circle">
+        <div class="scan-circle" id="circle">
             <video id="cam" autoplay playsinline muted></video>
+            <div class="face-guide"></div>
             <div class="scan-line" id="scan-line"></div>
         </div>
     </div>
@@ -302,10 +323,14 @@
                 .withFaceLandmarks()
                 .withFaceDescriptor()
                 .then(function (detection) {
+                    var circle = document.getElementById('circle');
                     if (!detection) {
+                        if(circle) circle.classList.remove('detected');
                         isProcessingAuto = false;
                         return;
                     }
+
+                    if(circle) circle.classList.add('detected');
 
                     // Verifikasi jarak wajah jika descriptor tersedia
                     if (faceDescriptorFromParent) {
