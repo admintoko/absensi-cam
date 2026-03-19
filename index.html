@@ -372,10 +372,10 @@
 
                     // 2. Verifikasi jarak wajah karena descriptor tersedia
                     var dist = faceapi.euclideanDistance(detection.descriptor, faceDescriptorFromParent);
-                    // Threshold diturunkan menjadi 0.4 untuk mencegah wajah orang lain yang agak mirip bisa lolos
-                    if (dist > 0.40) { 
+                    // Threshold disesuaikan menjadi 0.50 (karena 0.40 terlalu ketat)
+                    if (dist > 0.50) { 
                         if(failBox) {
-                            failBox.innerHTML = 'Wajah tidak cocok dengan data karyawan.<br>Jarak: ' + dist.toFixed(3) + ' (Batas Max: 0.40)<br>Harap gunakan ID Anda sendiri.';
+                            failBox.innerHTML = 'Wajah tidak cocok dengan data karyawan.<br>Jarak: ' + dist.toFixed(3) + ' (Batas Max: 0.50)<br>Harap gunakan ID Anda sendiri.';
                             failBox.style.display = 'block';
                         }
                         if(statusEl) {
