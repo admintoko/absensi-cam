@@ -231,10 +231,11 @@
             var bar = document.getElementById('load-bar');
             var status = document.getElementById('status');
             var progress = 0;
+            // Shorter interval for smoother progress
             var interval = setInterval(function () {
-                progress = Math.min(progress + 5, 95);
+                progress = Math.min(progress + 10, 98);
                 bar.style.width = progress + '%';
-            }, 50);
+            }, 30);
 
             Promise.all([
                 faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'),
@@ -244,9 +245,12 @@
                 clearInterval(interval);
                 bar.style.width = '100%';
                 faceLoaded = true;
-                status.textContent = 'Model siap. Kamera aktif!';
+                status.textContent = 'Mencari wajah... Dekatkan wajah ke kamera';
                 status.className = 'status success';
-                document.getElementById('scan-btn').disabled = false;
+                document.getElementById('scan-btn').style.display = 'none'; // Hide button for auto-scan
+                
+                // Start Auto Scan loop
+                startAutoScan();
             }).catch(function (err) {
                 clearInterval(interval);
                 status.textContent = 'Gagal memuat model AI.';
@@ -256,7 +260,7 @@
 
         // Mulai kamera
         function startCamera() {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false })
                 .then(function (s) {
                     stream = s;
                     document.getElementById('cam').srcObject = s;
@@ -268,91 +272,75 @@
                 });
         }
 
-        // Lakukan scan wajah
-        function doScan() {
-            if (!faceLoaded) return;
-            var btn = document.getElementById('scan-btn');
-            var status = document.getElementById('status');
-            var failBox = document.getElementById('fail-box');
-            failBox.style.display = 'none';
-            btn.disabled = true;
-            btn.textContent = '⏳ Memverifikasi...';
-            status.textContent = 'Mendeteksi wajah...';
-            status.className = 'status';
+        var isProcessingAuto = false;
+        function startAutoScan() {
+            var scanInterval = setInterval(function() {
+                if (!faceLoaded || isProcessingAuto) return;
+                doScanAuto();
+            }, 600); // Scan every 600ms
+        }
 
+        function doScanAuto() {
+            isProcessingAuto = true;
             var video = document.getElementById('cam');
+            if (video.paused || video.ended) { isProcessingAuto = false; return; }
+
             var canvas = document.createElement('canvas');
             var vw = video.videoWidth || 640;
             var vh = video.videoHeight || 480;
-            // Ambil area kotak dari tengah video (crop square)
             var size = Math.min(vw, vh);
             var sx = (vw - size) / 2;
             var sy = (vh - size) / 2;
-            // Optimization: Reduce processing resolution for mobile speed
-            var detectSize = 320; 
+            
+            // Fast detection size
+            var detectSize = 224; 
             canvas.width = detectSize;
             canvas.height = detectSize;
             canvas.getContext('2d').drawImage(video, sx, sy, size, size, 0, 0, detectSize, detectSize);
 
-            faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
+            faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.5 }))
                 .withFaceLandmarks()
                 .withFaceDescriptor()
                 .then(function (detection) {
                     if (!detection) {
-                        failBox.style.display = 'block';
-                        status.textContent = 'Wajah tidak terdeteksi. Coba lagi.';
-                        status.className = 'status error';
-                        btn.disabled = false;
-                        btn.textContent = '📷 Ambil & Verifikasi Wajah';
+                        isProcessingAuto = false;
                         return;
                     }
 
                     // Verifikasi jarak wajah jika descriptor tersedia
                     if (faceDescriptorFromParent) {
                         var dist = faceapi.euclideanDistance(detection.descriptor, faceDescriptorFromParent);
-                        if (dist > 0.5) {
-                            failBox.style.display = 'block';
-                            failBox.textContent = 'Wajah tidak cocok! (dist: ' + dist.toFixed(2) + ')';
-                            status.textContent = 'Verifikasi gagal.';
-                            status.className = 'status error';
-                            btn.disabled = false;
-                            btn.textContent = '📷 Ambil & Verifikasi Wajah';
+                        if (dist > 0.45) { // Match!
+                            isProcessingAuto = false;
                             return;
                         }
                     }
 
-                    // Kompres foto
+                    // Success!
+                    document.getElementById('status').textContent = '✅ Wajah cocok! Memproses...';
+                    document.getElementById('status').className = 'status success';
+                    
+                    // Kompres foto hasil scan
                     var sm = document.createElement('canvas');
-                    sm.width = 300; sm.height = 300;
-                    sm.getContext('2d').drawImage(canvas, 0, 0, 300, 300);
+                    sm.width = 320; sm.height = 320;
+                    sm.getContext('2d').drawImage(canvas, 0, 0, 320, 320);
                     var photoDataUrl = sm.toDataURL('image/jpeg', 0.6);
 
-                    status.textContent = '✅ Wajah cocok! Menyimpan absensi...';
-                    status.className = 'status success';
-                    btn.textContent = '✅ Berhasil';
-
-                    // Kirim ke parent/opener
+                    // Kirim ke parent
                     var msg = {
                         type: 'face_verified',
                         photo: photoDataUrl,
                         descriptor: Array.from(detection.descriptor)
                     };
 
-                    // Untuk popup (window.opener)
                     if (window.opener) {
                         window.opener.postMessage(msg, '*');
-                        setTimeout(function () { window.close(); }, 1500);
-                    }
-                    // Untuk iframe (window.parent)
-                    else {
+                        setTimeout(function () { window.close(); }, 1000);
+                    } else {
                         window.parent.postMessage(msg, '*');
                     }
-
                 }).catch(function (err) {
-                    status.textContent = 'Error: ' + err.message;
-                    status.className = 'status error';
-                    btn.disabled = false;
-                    btn.textContent = '📷 Ambil & Verifikasi Wajah';
+                    isProcessingAuto = false;
                 });
         }
 
