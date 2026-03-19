@@ -300,6 +300,8 @@
         var isProcessingAuto = false;
         var lastTime = 0;
         var scanFreq = 250; // Milliseconds between scans for better balance
+        var consecutiveSuccesses = 0;
+        var requiredSuccesses = 3;
 
         function startAutoScan() {
             function loop(time) {
@@ -348,6 +350,7 @@
                     var statusEl = document.getElementById('status');
 
                     if (!detection) {
+                        consecutiveSuccesses = 0;
                         if(circle) circle.classList.remove('detected');
                         if(failBox) failBox.style.display = 'none';
                         isProcessingAuto = false;
@@ -372,10 +375,11 @@
 
                     // 2. Verifikasi jarak wajah karena descriptor tersedia
                     var dist = faceapi.euclideanDistance(detection.descriptor, faceDescriptorFromParent);
-                    // Threshold disesuaikan menjadi 0.50 (karena 0.40 terlalu ketat)
-                    if (dist > 0.50) { 
+                    // Menggunakan skor 0.45 sebagai kompromi, tapi harus konsisten 3 frame berturut-turut
+                    if (dist > 0.45) { 
+                        consecutiveSuccesses = 0; // reset
                         if(failBox) {
-                            failBox.innerHTML = 'Wajah tidak cocok dengan data karyawan.<br>Jarak: ' + dist.toFixed(3) + ' (Batas Max: 0.50)<br>Harap gunakan ID Anda sendiri.';
+                            failBox.innerHTML = 'Wajah tidak cocok dengan data karyawan.<br>Jarak: ' + dist.toFixed(3) + ' (Batas Max: 0.45)<br>Harap gunakan ID Anda sendiri.';
                             failBox.style.display = 'block';
                         }
                         if(statusEl) {
@@ -386,7 +390,19 @@
                         return;
                     }
 
-                    // Success!
+                    // Cocok di satu frame, cek akumulasi
+                    consecutiveSuccesses++;
+                    if (consecutiveSuccesses < requiredSuccesses) {
+                        if(failBox) failBox.style.display = 'none';
+                        if(statusEl) {
+                            statusEl.textContent = 'Verifikasi wajah stabil... (' + consecutiveSuccesses + '/' + requiredSuccesses + ')';
+                            statusEl.className = 'status success';
+                        }
+                        isProcessingAuto = false;
+                        return; // tunggu frame berikutnya
+                    }
+
+                    // Berhasil stabil 3x berturut-turut!
                     if(failBox) failBox.style.display = 'none';
                     if(statusEl) {
                         statusEl.textContent = '✅ Wajah cocok! (Skor: ' + dist.toFixed(3) + ') Memproses...';
