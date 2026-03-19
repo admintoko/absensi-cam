@@ -299,9 +299,9 @@
 
         var isProcessingAuto = false;
         var lastTime = 0;
-        var scanFreq = 250; // Milliseconds between scans for better balance
+        var scanFreq = 100; // Milidetik dipercepat agar hasil instan
         var consecutiveSuccesses = 0;
-        var requiredSuccesses = 3;
+        var requiredSuccesses = 2; // 2 frame berturut cukup membuktikan tanpa memakan waktu
 
         function startAutoScan() {
             function loop(time) {
@@ -420,7 +420,7 @@
 
                     if (window.opener) {
                         window.opener.postMessage(msg, '*');
-                        setTimeout(function () { try { window.close(); } catch(e) {} }, 500);
+                        setTimeout(function () { try { window.close(); } catch(e) {} }, 50); // Tutup kilat
                     } else {
                         window.parent.postMessage(msg, '*');
                     }
