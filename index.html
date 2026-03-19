@@ -310,7 +310,7 @@
                     // Verifikasi jarak wajah jika descriptor tersedia
                     if (faceDescriptorFromParent) {
                         var dist = faceapi.euclideanDistance(detection.descriptor, faceDescriptorFromParent);
-                        if (dist > 0.45) { // Match!
+                        if (dist > 0.55) { // Match! (More relaxed for speed)
                             isProcessingAuto = false;
                             return;
                         }
