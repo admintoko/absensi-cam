@@ -298,17 +298,32 @@
         }
 
         var isProcessingAuto = false;
+        var lastTime = 0;
+        var scanFreq = 250; // Milliseconds between scans for better balance
+
         function startAutoScan() {
-            var scanInterval = setInterval(function() {
-                if (!faceLoaded || isProcessingAuto) return;
-                doScanAuto();
-            }, 400); // Super fast: scan every 400ms
+            function loop(time) {
+                if (!faceLoaded) {
+                    requestAnimationFrame(loop);
+                    return;
+                }
+                
+                if (!isProcessingAuto && (time - lastTime > scanFreq)) {
+                    lastTime = time;
+                    doScanAuto();
+                }
+                requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
         }
 
         function doScanAuto() {
             isProcessingAuto = true;
             var video = document.getElementById('cam');
-            if (video.paused || video.ended) { isProcessingAuto = false; return; }
+            if (video.paused || video.ended || video.readyState < 2) { 
+                isProcessingAuto = false; 
+                return; 
+            }
 
             var canvas = document.createElement('canvas');
             var vw = video.videoWidth || 640;
@@ -317,13 +332,14 @@
             var sx = (vw - size) / 2;
             var sy = (vh - size) / 2;
             
-            // Ultra-fast detection: very small size (128-160px is enough for headshots)
-            var detectSize = 160; 
+            // Balanced size for SPEED + QUALITY
+            var detectSize = 224; 
             canvas.width = detectSize;
             canvas.height = detectSize;
             canvas.getContext('2d').drawImage(video, sx, sy, size, size, 0, 0, detectSize, detectSize);
 
-            faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.5 }))
+            // Tiny Detector with 160px input for better landmark accuracy while remaining fast
+            faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.4 }))
                 .withFaceLandmarks()
                 .withFaceDescriptor()
                 .then(function (detection) {
@@ -339,7 +355,8 @@
                     // Verifikasi jarak wajah jika descriptor tersedia
                     if (faceDescriptorFromParent) {
                         var dist = faceapi.euclideanDistance(detection.descriptor, faceDescriptorFromParent);
-                        if (dist > 0.6) { // Optimized for SPEED: Relaxed threshold (0.6)
+                        // Instant match at 0.65 threshold (very tolerant for speed)
+                        if (dist > 0.65) { 
                             isProcessingAuto = false;
                             return;
                         }
@@ -349,13 +366,9 @@
                     document.getElementById('status').textContent = '✅ Wajah cocok! Memproses...';
                     document.getElementById('status').className = 'status success';
                     
-                    // Kompres foto hasil scan
-                    var sm = document.createElement('canvas');
-                    sm.width = 320; sm.height = 320;
-                    sm.getContext('2d').drawImage(canvas, 0, 0, 320, 320);
-                    var photoDataUrl = sm.toDataURL('image/jpeg', 0.6);
+                    // High-speed return
+                    var photoDataUrl = canvas.toDataURL('image/jpeg', 0.6); // Use the existing detection canvas to save time
 
-                    // Kirim ke parent
                     var msg = {
                         type: 'face_verified',
                         photo: photoDataUrl,
@@ -364,7 +377,7 @@
 
                     if (window.opener) {
                         window.opener.postMessage(msg, '*');
-                        setTimeout(function () { window.close(); }, 1000);
+                        setTimeout(function () { try { window.close(); } catch(e) {} }, 500);
                     } else {
                         window.parent.postMessage(msg, '*');
                     }
