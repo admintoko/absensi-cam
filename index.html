@@ -9,11 +9,11 @@
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <!-- Pre-fetch models for speed -->
     <link rel="prefetch"
-        href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/tiny_face_detector_model-weights_manifest.json">
+        href="https://unpkg.com/@vladmandic/face-api/model/tiny_face_detector_model-weights_manifest.json">
     <link rel="prefetch"
-        href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/face_landmark_68_tiny_model-weights_manifest.json">
+        href="https://unpkg.com/@vladmandic/face-api/model/face_landmark_68_tiny_model-weights_manifest.json">
     <link rel="prefetch"
-        href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/face_recognition_model-weights_manifest.json">
+        href="https://unpkg.com/@vladmandic/face-api/model/face_recognition_model-weights_manifest.json">
     <style>
         * {
             margin: 0;
@@ -254,49 +254,73 @@
             return map[type] || 'Scan Wajah';
         }
 
-        // Load Face API models
-        function loadModels() {
+        // Setup AI Download in Parallel (Mulai terunduh seketika browser membaca baris ini)
+        var modelDownloadError = false;
+        var barInterval = setInterval(function () {
             var bar = document.getElementById('load-bar');
+            if(bar && !faceLoaded && !modelDownloadError) {
+                var current = parseFloat(bar.style.width) || 0;
+                bar.style.width = Math.min(current + 2, 95) + '%';
+            }
+        }, 100);
+
+        var loadModelsPromise = Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri('https://unpkg.com/@vladmandic/face-api/model/'),
+            faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://unpkg.com/@vladmandic/face-api/model/'),
+            faceapi.nets.faceRecognitionNet.loadFromUri('https://unpkg.com/@vladmandic/face-api/model/')
+        ]).then(function () {
+            faceLoaded = true;
+            checkReadyState();
+        }).catch(function (err) {
+            modelDownloadError = true;
+            clearInterval(barInterval);
             var status = document.getElementById('status');
-            var progress = 0;
-            // Shorter interval for smoother progress
-            var interval = setInterval(function () {
-                progress = Math.min(progress + 10, 98);
-                bar.style.width = progress + '%';
-            }, 30);
-
-            Promise.all([
-                faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'),
-                faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'),
-                faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model')
-            ]).then(function () {
-                clearInterval(interval);
-                bar.style.width = '100%';
-                faceLoaded = true;
-                status.textContent = 'Mencari wajah... Dekatkan wajah ke kamera';
-                status.className = 'status success';
-                document.getElementById('scan-btn').style.display = 'none'; // Hide button for auto-scan
-
-                // Start Auto Scan loop
-                startAutoScan();
-            }).catch(function (err) {
-                clearInterval(interval);
-                status.textContent = 'Gagal memuat model AI.';
+            if(status) {
+                status.textContent = 'Gagal memuat model AI. Cek koneksi internet Anda.';
                 status.className = 'status error';
-            });
+            }
+        });
+
+        function checkReadyState() {
+            var status = document.getElementById('status');
+            if (faceLoaded && stream) {
+                clearInterval(barInterval);
+                var bar = document.getElementById('load-bar');
+                if(bar) {
+                    bar.style.width = '100%';
+                    setTimeout(function() { document.querySelector('.loading-bar').style.display = 'none'; }, 400);
+                }
+                if(status) {
+                    status.textContent = 'Mencari wajah... Dekatkan wajah ke kamera';
+                    status.className = 'status success';
+                }
+                document.getElementById('scan-btn').style.display = 'none';
+                startAutoScan();
+            } else if (faceLoaded && !stream) {
+                if (status && status.textContent.includes("Memuat model AI")) {
+                     status.innerHTML = 'Model AI siap. Menunggu izin kamera...';
+                }
+            } else if (!faceLoaded && stream) {
+                if (status && !modelDownloadError) {
+                     status.innerHTML = 'Kamera memutar.<br>Sedang mengunduh data wajah AI (+/- 5 MB)...<br>Lama waktu tergantung sinyal internet.';
+                }
+            }
         }
 
-        // Mulai kamera
+        // Mulai kamera (berjalan paralel tanpa memblokir download)
         function startCamera() {
             navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } }, audio: false })
                 .then(function (s) {
                     stream = s;
                     document.getElementById('cam').srcObject = s;
-                    loadModels();
+                    checkReadyState();
                 })
                 .catch(function (err) {
-                    document.getElementById('status').textContent = 'Gagal akses kamera: ' + err.message;
-                    document.getElementById('status').className = 'status error';
+                    var status = document.getElementById('status');
+                    if(status) {
+                        status.textContent = 'Gagal akses kamera: ' + err.message;
+                        status.className = 'status error';
+                    }
                 });
         }
 
