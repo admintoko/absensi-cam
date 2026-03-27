@@ -8,9 +8,12 @@
     <title>Scan Wajah</title>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <!-- Pre-fetch models for speed -->
-    <link rel="prefetch" href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/tiny_face_detector_model-weights_manifest.json">
-    <link rel="prefetch" href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/face_landmark_68_model-weights_manifest.json">
-    <link rel="prefetch" href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/face_recognition_model-weights_manifest.json">
+    <link rel="prefetch"
+        href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/tiny_face_detector_model-weights_manifest.json">
+    <link rel="prefetch"
+        href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/face_landmark_68_tiny_model-weights_manifest.json">
+    <link rel="prefetch"
+        href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/face_recognition_model-weights_manifest.json">
     <style>
         * {
             margin: 0;
@@ -56,8 +59,8 @@
             transform: translate(-50%, -50%);
             width: 70%;
             height: 80%;
-            border: 2px dashed rgba(255,255,255,0.4);
-            border-radius: 50% 50% 45% 45%; 
+            border: 2px dashed rgba(255, 255, 255, 0.4);
+            border-radius: 50% 50% 45% 45%;
             pointer-events: none;
             z-index: 5;
         }
@@ -264,7 +267,7 @@
 
             Promise.all([
                 faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'),
-                faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'),
+                faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'),
                 faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model')
             ]).then(function () {
                 clearInterval(interval);
@@ -273,7 +276,7 @@
                 status.textContent = 'Mencari wajah... Dekatkan wajah ke kamera';
                 status.className = 'status success';
                 document.getElementById('scan-btn').style.display = 'none'; // Hide button for auto-scan
-                
+
                 // Start Auto Scan loop
                 startAutoScan();
             }).catch(function (err) {
@@ -285,7 +288,7 @@
 
         // Mulai kamera
         function startCamera() {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false })
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } }, audio: false })
                 .then(function (s) {
                     stream = s;
                     document.getElementById('cam').srcObject = s;
@@ -299,7 +302,7 @@
 
         var isProcessingAuto = false;
         var lastTime = 0;
-        var scanFreq = 100; // Milidetik dipercepat agar hasil instan
+        var scanFreq = 300; // Dikurangi agar tidak membuat lag di HP kentang
         var consecutiveSuccesses = 0;
         var requiredSuccesses = 2; // 2 frame berturut cukup membuktikan tanpa memakan waktu
 
@@ -309,7 +312,7 @@
                     requestAnimationFrame(loop);
                     return;
                 }
-                
+
                 if (!isProcessingAuto && (time - lastTime > scanFreq)) {
                     lastTime = time;
                     doScanAuto();
@@ -322,9 +325,9 @@
         function doScanAuto() {
             isProcessingAuto = true;
             var video = document.getElementById('cam');
-            if (video.paused || video.ended || video.readyState < 2) { 
-                isProcessingAuto = false; 
-                return; 
+            if (video.paused || video.ended || video.readyState < 2) {
+                isProcessingAuto = false;
+                return;
             }
 
             var canvas = document.createElement('canvas');
@@ -333,16 +336,16 @@
             var size = Math.min(vw, vh);
             var sx = (vw - size) / 2;
             var sy = (vh - size) / 2;
-            
+
             // Balanced size for SPEED + QUALITY
-            var detectSize = 224; 
+            var detectSize = 224;
             canvas.width = detectSize;
             canvas.height = detectSize;
             canvas.getContext('2d').drawImage(video, sx, sy, size, size, 0, 0, detectSize, detectSize);
 
             // Tiny Detector with 160px input for better landmark accuracy while remaining fast
             faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.4 }))
-                .withFaceLandmarks()
+                .withFaceLandmarks(true) // Gunakan param `true` untuk tiny face landmarks (sangat ringan)
                 .withFaceDescriptor()
                 .then(function (detection) {
                     var circle = document.getElementById('circle');
@@ -351,21 +354,21 @@
 
                     if (!detection) {
                         consecutiveSuccesses = 0;
-                        if(circle) circle.classList.remove('detected');
-                        if(failBox) failBox.style.display = 'none';
+                        if (circle) circle.classList.remove('detected');
+                        if (failBox) failBox.style.display = 'none';
                         isProcessingAuto = false;
                         return;
                     }
 
-                    if(circle) circle.classList.add('detected');
+                    if (circle) circle.classList.add('detected');
 
                     // 1. Cek apakah admin sudah mendaftarkan wajah karyawan ini
                     if (!faceDescriptorFromParent || faceDescriptorFromParent.length === 0) {
-                        if(failBox) {
+                        if (failBox) {
                             failBox.innerHTML = 'Data wajah belum terdaftar di sistem.<br>Silakan hubungi Admin untuk mendaftar.';
                             failBox.style.display = 'block';
                         }
-                        if(statusEl) {
+                        if (statusEl) {
                             statusEl.textContent = 'Gagal: Wajah Belum Terdaftar';
                             statusEl.className = 'status error';
                         }
@@ -376,13 +379,13 @@
                     // 2. Verifikasi jarak wajah karena descriptor tersedia
                     var dist = faceapi.euclideanDistance(detection.descriptor, faceDescriptorFromParent);
                     // Menggunakan skor 0.45 sebagai kompromi, tapi harus konsisten 3 frame berturut-turut
-                    if (dist > 0.45) { 
+                    if (dist > 0.45) {
                         consecutiveSuccesses = 0; // reset
-                        if(failBox) {
+                        if (failBox) {
                             failBox.innerHTML = 'Wajah tidak cocok dengan data karyawan.<br>Jarak: ' + dist.toFixed(3) + ' (Batas Max: 0.45)<br>Harap gunakan ID Anda sendiri.';
                             failBox.style.display = 'block';
                         }
-                        if(statusEl) {
+                        if (statusEl) {
                             statusEl.textContent = 'Gagal: Wajah Berbeda (' + dist.toFixed(2) + ')';
                             statusEl.className = 'status error';
                         }
@@ -393,8 +396,8 @@
                     // Cocok di satu frame, cek akumulasi
                     consecutiveSuccesses++;
                     if (consecutiveSuccesses < requiredSuccesses) {
-                        if(failBox) failBox.style.display = 'none';
-                        if(statusEl) {
+                        if (failBox) failBox.style.display = 'none';
+                        if (statusEl) {
                             statusEl.textContent = 'Verifikasi wajah stabil... (' + consecutiveSuccesses + '/' + requiredSuccesses + ')';
                             statusEl.className = 'status success';
                         }
@@ -403,12 +406,12 @@
                     }
 
                     // Berhasil stabil 3x berturut-turut!
-                    if(failBox) failBox.style.display = 'none';
-                    if(statusEl) {
+                    if (failBox) failBox.style.display = 'none';
+                    if (statusEl) {
                         statusEl.textContent = '✅ Wajah cocok! (Skor: ' + dist.toFixed(3) + ') Memproses...';
                         statusEl.className = 'status success';
                     }
-                    
+
                     // High-speed return
                     var photoDataUrl = canvas.toDataURL('image/jpeg', 0.6); // Use the existing detection canvas to save time
 
@@ -420,7 +423,7 @@
 
                     if (window.opener) {
                         window.opener.postMessage(msg, '*');
-                        setTimeout(function () { try { window.close(); } catch(e) {} }, 50); // Tutup kilat
+                        setTimeout(function () { try { window.close(); } catch (e) { } }, 50); // Tutup kilat
                     } else {
                         window.parent.postMessage(msg, '*');
                     }
@@ -431,7 +434,7 @@
 
         // Start
         function initApp() {
-            if(!window.appInitialized) {
+            if (!window.appInitialized) {
                 window.appInitialized = true;
                 startCamera();
             }
